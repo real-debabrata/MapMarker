@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Map Marker & Distance Tool</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  :root{
+    --primary:#2563eb;
+    --primary-dark:#1d4ed8;
+    --bg:#f4f6f8;
+    --panel:#ffffff;
+    --border:#e2e6ea;
+    --text:#1f2937;
+    --muted:#6b7280;
+    --danger:#dc2626;
+    --danger-dark:#b91c1c;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:var(--text);
+    background:var(--bg);
+  }
+  #app{
+    display:flex;
+    height:100vh;
+    width:100vw;
+  }
+  #map{
+    flex:1;
+    height:100%;
+  }
+  #sidebar{
+    width:360px;
+    min-width:300px;
+    max-width:420px;
+    background:var(--panel);
+    border-left:1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    height:100%;
+  }
+  #sidebar-header{
+    padding:16px 18px 12px;
+    border-bottom:1px solid var(--border);
+  }
+  #sidebar-header h1{
+    font-size:16px;
+    margin:0 0 4px;
+    font-weight:700;
+  }
+  #sidebar-header p{
+    margin:0;
+    font-size:12.5px;
+    color:var(--muted);
+    line-height:1.4;
+  }
+  #search-row{
+    display:flex;
+    gap:6px;
+    padding:10px 18px;
+    border-bottom:1px solid var(--border);
+  }
+  #search-input{
+    flex:1;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:13px;
+    outline:none;
+  }
+  #search-input:focus{border-color:var(--primary);}
+  .btn{
+    border:none;
+    border-radius:6px;
+    padding:8px 12px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s ease;
+    white-space:nowrap;
+  }
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover{background:var(--primary-dark);}
+  .btn-secondary{background:#eef1f5;color:var(--text);}
+  .btn-secondary:hover{background:#e2e6eb;}
+  .btn-danger{background:#fdecec;color:var(--danger);}
+  .btn-danger:hover{background:#fbdada;color:var(--danger-dark);}
+  #stats{
+    padding:12px 18px;
+    border-bottom:1px solid var(--border);
+    font-size:13px;
+    background:#fafbfc;
+  }
+  #stats .stat-row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:4px;
+  }
+  #stats .stat-row:last-child{margin-bottom:0;}
+  #stats .label{color:var(--muted);}
+  #stats .value{font-weight:700;}
+  #actions{
+    display:flex;
+    gap:8px;
+    padding:10px 18px;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  #list-wrap{
+    flex:1;
+    overflow-y:auto;
+    padding:8px 10px;
+  }
+  .point-card{
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:8px;
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .point-num{
+    width:24px;height:24px;
+    background:var(--primary);
+    color:#fff;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;
+    flex-shrink:0;
+    margin-top:2px;
+  }
+  .point-info{flex:1;min-width:0;}
+  .point-coords{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:12.5px;
+    font-weight:600;
+  }
+  .point-seg{
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .point-remove{
+    background:none;
+    border:none;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px 4px;
+    flex-shrink:0;
+  }
+  .point-remove:hover{color:var(--danger);}
+  #empty-state{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    padding:40px 20px;
+    line-height:1.6;
+  }
+  #export-wrap{
+    border-top:1px solid var(--border);
+    padding:10px 18px 16px;
+  }
+  #export-textarea{
+    width:100%;
+    height:90px;
+    resize:none;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:11.5px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:8px;
+    margin-top:8px;
+    background:#fafbfc;
+  }
+  .export-btns{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+  }
+  .leaflet-div-icon-label{
+    background:var(--primary);
+    color:#fff;
+    border-radius:50%;
+    width:26px;height:26px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;
+    border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.4);
+  }
+  #toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#1f2937;
+    color:#fff;
+    padding:10px 18px;
+    border-radius:6px;
+    font-size:13px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease;
+    z-index:9999;
+  }
+  #toast.show{opacity:1;}
+
+  @media (max-width: 720px){
+    #app{flex-direction:column;}
+    #sidebar{
+      width:100%;
+      max-width:none;
+      height:45%;
+      border-left:none;
+      border-top:1px solid var(--border);
+    }
+    #map{height:55%;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="map"></div>
+
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>📍 Map Marker & Distance Tool</h1>
+      <p>Click anywhere on the map to drop a numbered marker. Markers connect in order, and distances update automatically.</p>
+    </div>
+
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="Search a place (e.g. Imphal, Manipur)..." />
+      <button class="btn btn-primary" id="search-btn">Go</button>
+    </div>
+
+    <div id="stats">
+      <div class="stat-row"><span class="label">Points marked</span><span class="value" id="stat-count">0</span></div>
+      <div class="stat-row"><span class="label">Total distance</span><span class="value" id="stat-dist-km">0.000 km</span></div>
+      <div class="stat-row"><span class="label">Total distance (miles)</span><span class="value" id="stat-dist-mi">0.000 mi</span></div>
+    </div>
+
+    <div id="actions">
+      <button class="btn btn-secondary" id="undo-btn">↩ Undo Last</button>
+      <button class="btn btn-danger" id="clear-btn">🗑 Clear All</button>
+    </div>
+
+    <div id="list-wrap">
+      <div id="empty-state">No points yet.<br>Click on the map to start marking.</div>
+      <div id="point-list"></div>
+    </div>
+
+    <div id="export-wrap">
+      <div style="font-size:12.5px;font-weight:700;">Coordinates (longitude, latitude — 6 decimals)</div>
+      <textarea id="export-textarea" readonly placeholder="Marked coordinates will appear here in serial order..."></textarea>
+      <div class="export-btns">
+        <button class="btn btn-primary" id="copy-btn" style="flex:1;">📋 Copy List</button>
+        <button class="btn btn-secondary" id="download-btn" style="flex:1;">⬇ Download CSV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  // ---- Map setup ----
+  const map = L.map('map', { zoomControl: true }).setView([24.8333, 93.6333], 6); // default view around NE India
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  let points = [];       // {lat, lng, marker}
+  let polyline = null;
+
+  function makeNumberIcon(num){
+    return L.divIcon({
+      className: '',
+      html: `<div class="leaflet-div-icon-label">${num}</div>`,
+      iconSize: [26,26],
+      iconAnchor: [13,13]
+    });
+  }
+
+  function haversine(lat1, lon1, lat2, lon2){
+    const R = 6371; // km
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R*c;
+  }
+
+  function fmt(n){ return n.toFixed(6); }
+
+  function renumberMarkers(){
+    points.forEach((p, i) => {
+      p.marker.setIcon(makeNumberIcon(i+1));
+      p.marker.setPopupContent(popupHtml(i));
+    });
+  }
+
+  function popupHtml(i){
+    const p = points[i];
+    return `<b>Point ${i+1}</b><br>${fmt(p.lat)}, ${fmt(p.lng)}`;
+  }
+
+  function redrawLine(){
+    if(polyline){ map.removeLayer(polyline); polyline = null; }
+    if(points.length > 1){
+      polyline = L.polyline(points.map(p => [p.lat, p.lng]), {
+        color: '#2563eb', weight: 3, opacity: 0.85
+      }).addTo(map);
+    }
+  }
+
+  function totalDistanceKm(){
+    let total = 0;
+    for(let i=1;i<points.length;i++){
+      total += haversine(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+    }
+    return total;
+  }
+
+  function updateAll(){
+    redrawLine();
+    renderList();
+    updateStats();
+    updateExport();
+  }
+
+  function updateStats(){
+    document.getElementById('stat-count').textContent = points.length;
+    const km = totalDistanceKm();
+    document.getElementById('stat-dist-km').textContent = km.toFixed(3) + ' km';
+    document.getElementById('stat-dist-mi').textContent = (km*0.621371).toFixed(3) + ' mi';
+  }
+
+  function renderList(){
+    const listEl = document.getElementById('point-list');
+    const emptyEl = document.getElementById('empty-state');
+    listEl.innerHTML = '';
+    if(points.length === 0){
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    points.forEach((p, i) => {
+      const card = document.createElement('div');
+      card.className = 'point-card';
+
+      let segText = '';
+      if(i > 0){
+        const d = haversine(points[i-1].lat, points[i-1].lng, p.lat, p.lng);
+        segText = `+ ${d.toFixed(3)} km from point ${i}`;
+      } else {
+        segText = 'Start point';
+      }
+
+      card.innerHTML = `
+        <div class="point-num">${i+1}</div>
+        <div class="point-info">
+          <div class="point-coords">${fmt(p.lat)}, ${fmt(p.lng)}</div>
+          <div class="point-seg">${segText}</div>
+        </div>
+        <button class="point-remove" title="Remove point" data-idx="${i}">✕</button>
+      `;
+      listEl.appendChild(card);
+    });
+
+    listEl.querySelectorAll('.point-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.currentTarget.getAttribute('data-idx'), 10);
+        removePoint(idx);
+      });
+    });
+  }
+
+  function updateExport(){
+    const lines = points.map(p => `${fmt(p.lng)}, ${fmt(p.lat)}`);
+    document.getElementById('export-textarea').value = lines.join('\n');
+  }
+
+  function addPoint(lat, lng){
+    const marker = L.marker([lat, lng], { icon: makeNumberIcon(points.length+1), draggable: true }).addTo(map);
+    const pointObj = { lat, lng, marker };
+    points.push(pointObj);
+    marker.bindPopup(popupHtml(points.length-1));
+
+    marker.on('dragend', function(){
+      const pos = marker.getLatLng();
+      pointObj.lat = pos.lat;
+      pointObj.lng = pos.lng;
+      updateAll();
+    });
+
+    // Double-click (desktop) / double-tap (mobile) on a marker removes it
+    marker.on('dblclick', function(e){
+      L.DomEvent.stopPropagation(e); // prevent map's dblclick-zoom and click-to-add firing
+      const idx = points.findIndex(p => p.marker === marker);
+      if(idx !== -1) removePoint(idx);
+    });
+
+    updateAll();
+  }
+
+  function removePoint(idx){
+    map.removeLayer(points[idx].marker);
+    points.splice(idx, 1);
+    renumberMarkers();
+    updateAll();
+  }
+
+  function undoLast(){
+    if(points.length === 0) return;
+    removePoint(points.length - 1);
+  }
+
+  function clearAll(){
+    points.forEach(p => map.removeLayer(p.marker));
+    points = [];
+    if(polyline){ map.removeLayer(polyline); polyline = null; }
+    updateAll();
+  }
+
+  map.on('click', function(e){
+    addPoint(e.latlng.lat, e.latlng.lng);
+  });
+
+  // ---- UI bindings ----
+  document.getElementById('undo-btn').addEventListener('click', undoLast);
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    if(points.length === 0) return;
+    if(confirm('Clear all marked points?')) clearAll();
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    const text = document.getElementById('export-textarea').value;
+    if(!text){ showToast('No points to copy yet'); return; }
+    navigator.clipboard.writeText(text).then(() => showToast('Coordinates copied to clipboard'));
+  });
+
+  document.getElementById('download-btn').addEventListener('click', () => {
+    if(points.length === 0){ showToast('No points to export yet'); return; }
+    let csv = 'Longitude,Latitude\n';
+    points.forEach(p => {
+      csv += `${fmt(p.lng)},${fmt(p.lat)}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'marked_coordinates.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ---- Search (Nominatim) ----
+  document.getElementById('search-btn').addEventListener('click', doSearch);
+  document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') doSearch();
+  });
+
+  function doSearch(){
+    const q = document.getElementById('search-input').value.trim();
+    if(!q) return;
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(results => {
+        if(results.length === 0){ showToast('Place not found'); return; }
+        const { lat, lon } = results[0];
+        map.setView([parseFloat(lat), parseFloat(lon)], 13);
+      })
+      .catch(() => showToast('Search failed — check your connection'));
+  }
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  updateAll();
+})();
+</script>
+
+</body>
+</html>
